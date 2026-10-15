@@ -238,7 +238,26 @@ for(let f of foods)if(!f.available&&f!==player.carrying){f.timer-=dt;if(f.timer<
 for(let p of poops){p.ttl-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;p.vy-=29*dt;let hit=false;for(let t of tourists){if(p.ttl<=0||hit)break;if(Math.hypot(p.x-t.x,p.z-t.z)<1.5&&p.y<(t.onPier?4.95:3.80)&&p.y>(t.onPier?1.05:-.3)){t.hit=4;t.scared=4;t.dir=rnd(-3,3);spawnSplat(p.x,(t.onPier?1.14:0)+3.05,p.z);award(t.onPier?230:170,pick(['DIRECT HIT! 💩','POOP STRIKE!','YOU ABSOLUTE MENACE!','BIRD BOMB!']));advance('hit');if(t.onPier)advance('pier');p.ttl=0;hit=true;}}if(!hit){for(let c of carObjects){if(Math.abs(p.x-c.x)<2.4&&Math.abs(p.z-c.z)<1.65&&p.y<2.2&&p.y>0){spawnSplat(p.x,1.75,p.z);award(140,'WINDSHIELD WASH REQUIRED!');advance('car');p.ttl=0;hit=true;break;}}}if(!hit&&p.y<=(standingSurface(p.x,p.z)??0)){spawnSplat(p.x,(standingSurface(p.x,p.z)??0)+.05,p.z);p.ttl=0;award(3);}}
 poops=poops.filter(p=>p.ttl>0);for(let s of splats)s.ttl-=dt;splats=splats.filter(s=>s.ttl>0);for(let c of carObjects){if(!c.v)continue;c.x+=c.v*dt;if(Math.abs(c.x)>156)c.v*=-1;}
 }
-function makeNPC(mesh,p){let bob=p.hit>0?-.55:Math.abs(Math.sin(p.phase))*.08,tip=p.hit>0?-.7:0;mesh.push(p.x,p.onPier?1.14:0,p.z,p.dir||0,0,tip);mesh.scale(1.95);mesh.cylinder(0,.97+bob,0,.29,.96,p.shirt,8);mesh.box(0,.49+bob,0,.49,.25,.36,[.24,.3,.38]);mesh.ball(0,1.47+bob,0,.31,p.skin,7,5);mesh.box(0,1.73+bob,.08,.35,.11,.4,[.26,.22,.18]);mesh.box(-.12,1.55+bob,-.20,.05,.05,.035,[.12,.16,.18]);mesh.box(.12,1.55+bob,-.20,.05,.05,.035,[.12,.16,.18]);mesh.box(0,1.20+bob,-.27,.18,.08,.04,[.93,.91,.86]);let step=p.scared>0?Math.sin(p.phase)*.45:Math.sin(p.phase)*.23;for(let s of [-1,1]){mesh.push(s*.15,.225,0,0,step*s*.65,0);mesh.cylinder(0,0,0,.105,.40,p.skin,7);mesh.box(0,-.195,-.055,.20,.105,.33,[.17,.21,.26]);mesh.pop();mesh.push(s*.37,1.02+bob,0,0,p.scared>0?-1.1:step*s*.5,0);mesh.cylinder(0,-.12,0,.10,.6,p.skin,5);mesh.pop()}if(p.hit>0){mesh.ball(0,1.88,-.15,.24,[.94,.95,.89],7,4);}mesh.pop();mesh.pop()}
+function makeNPC(mesh,p){
+ const bob=p.hit>0?-.36:Math.abs(Math.sin(p.phase))*.045,tip=p.hit>0?-.5:0;
+ mesh.push(p.x,p.onPier?1.14:0,p.z,p.dir||0,0,tip);mesh.scale(1.95);
+ // Closed, overlapping anatomical volumes prevent view-through at the hips, shoulders and ankles.
+ mesh.box(0,.49+bob,0,.50,.41,.40,[.24,.29,.37]);
+ mesh.box(0,1.05+bob,0,.65,.82,.44,p.shirt);
+ mesh.ball(0,1.49+bob,0,.32,p.skin,9,7);
+ mesh.ball(0,1.72+bob,.045,.32,[.27,.22,.18],8,5);
+ for(let side of [-1,1]){
+  mesh.push(side*.155,.31+bob,0,0,Math.sin(p.phase)*(p.scared>0?.35:.19)*side,0);
+  mesh.cylinder(0,-.13,0,.145,.58,[.27,.32,.42],9);
+  mesh.box(0,-.43,-.07,.26,.16,.39,[.15,.2,.25]);mesh.pop();
+  mesh.push(side*.40,1.11+bob,0,0,p.scared>0?-0.8:Math.sin(p.phase)*.13*side,0);
+  mesh.ball(0,.03,0,.19,p.shirt,8,6);
+  mesh.cylinder(0,-.23,0,.12,.53,p.skin,8);mesh.ball(0,-.49,0,.12,p.skin,7,5);mesh.pop();
+ }
+ mesh.box(-.115,1.52+bob,-.30,.055,.047,.05,[.12,.15,.17]);mesh.box(.115,1.52+bob,-.30,.055,.047,.05,[.12,.15,.17]);
+ if(p.hit>0)mesh.ball(0,1.82,-.19,.23,[.94,.95,.89],8,6);
+ mesh.pop();mesh.pop();
+}
 function renderProp(mesh,p){mesh.push(p.x,p.y,p.z,0,0,clamp(p.tip,-1.35,1.35));if(p.type==='umbrella'){mesh.cylinder(0,1.6,0,.085,3.2,[.83,.82,.76],6);for(let i=0;i<8;i++){let a=i*Math.PI/4,b=(i+1)*Math.PI/4;mesh.tri([0,3.6,0],[Math.cos(a)*2.0,2.7,Math.sin(a)*2.0],[Math.cos(b)*2.0,2.7,Math.sin(b)*2.0],i%2?p.col:C.white)}}
 if(p.type==='chair'){mesh.push(0,.35,0,0,0,-.14);mesh.box(0,.4,0,1.7,.2,1.15,p.col);mesh.box(0,1,-.47,1.7,1.1,.22,p.col);for(let s of [-1,1])for(let t of [-1,1])mesh.cylinder(s*.68,.15,t*.43,.08,.3,C.wood,5);mesh.pop()}
 if(p.type==='ball'){mesh.ball(0,.8,0,1,p.col,10,7);mesh.torus(0,.8,0,.7,.09,C.white,14)}
