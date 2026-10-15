@@ -26,3 +26,15 @@
 
 /* Touch-control refinement: larger target, visible joystick response */
 @media (pointer:coarse){#joystick{width:142px;height:142px;left:18px;bottom:max(22px,env(safe-area-inset-bottom))}#knob{left:44px;top:44px}#actions{bottom:max(18px,env(safe-area-inset-bottom));gap:9px}#actions button{min-height:66px;min-width:72px}body{touch-action:none}}
+
+/* V4: Mobile touch controls are sized to their actual interactive bounds. */
+@media (pointer:coarse),(max-width:720px){
+ #mobile{position:fixed;inset:0;pointer-events:none;z-index:30}
+ #joystick{z-index:31;pointer-events:auto;touch-action:none}
+ #actions{z-index:32;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:min(40vw,190px);right:max(10px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));gap:8px;pointer-events:auto}
+ #actions button{box-sizing:border-box;display:flex;align-items:center;justify-content:center;width:100%;height:60px;min-width:0;min-height:60px;margin:0;padding:6px 3px;border-radius:12px;position:relative;pointer-events:auto;touch-action:none;-webkit-user-select:none;user-select:none}
+ #actions button.pressed{background:#fbd45d;color:#10283a;border-color:white;transform:scale(.97)}
+ #knob{pointer-events:none}
+ #hud,#mapwrap,#mission,#ammo,#alt,#flightmode{pointer-events:none}
+ #pauseBtn{pointer-events:auto}
+}
