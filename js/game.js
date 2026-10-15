@@ -30,7 +30,16 @@ class Mesh{constructor(){this.d=[];this.stack=[matIdentity()];}push(x=0,y=0,z=0,
 // A stylized 3D setting, inspired by the actual beachfront shopping district.
 let staticMesh=new Mesh(),m=staticMesh,buildings=[],props=[],tourists=[],foods=[],poops=[],splats=[],popups=[],flags=[],landmarkEls=[],carObjects=[],petals=[];
 function randColor(){return pick([[.9,.52,.4],[.5,.76,.83],[.95,.82,.42],[.71,.62,.83],[.75,.85,.67],[.92,.73,.65]])}
-function addBuilding(x,z,w,d,h,col,name){h*=1.75;buildings.push({x,z,w,d,h,name});m.box(x,h/2,z,w,h,d,col);facadeDetails(x,z,w,d,h,col);m.box(x,h+.55,z,w+1,1.1,d+1,C.white);m.box(x,h+1.2,z,w+1.5,.32,d+1.5,C.roof);for(let k=-1;k<=1;k++){let wy=h*.58;if(w>8){m.box(x+k*w*.26,wy,z+(z<12? d/2+.07 : -d/2-.07),w*.18,h*.29,.15,[.26,.48,.59]);m.box(x+k*w*.26,wy,z+(z<12? d/2+.18 : -d/2-.18),w*.18,.26,.2,C.white);}}return {x,y:h+2,z,name};}
+const facadeVertices=[],textureBuffer=gl.createBuffer();
+const texturedVS=`attribute vec3 aPosition;attribute vec2 aUV;uniform mat4 uTransform;varying vec2 vUV;void main(){gl_Position=uTransform*vec4(aPosition,1.0);vUV=aUV;}`;
+const texturedFS=`precision mediump float;varying vec2 vUV;uniform sampler2D uTexture;void main(){gl_FragColor=vec4(texture2D(uTexture,vUV).rgb,1.0);}`;
+const texProgram=gl.createProgram();gl.attachShader(texProgram,shader(gl.VERTEX_SHADER,texturedVS));gl.attachShader(texProgram,shader(gl.FRAGMENT_SHADER,texturedFS));gl.linkProgram(texProgram);
+const texPos=gl.getAttribLocation(texProgram,'aPosition'),texUV=gl.getAttribLocation(texProgram,'aUV'),texVP=gl.getUniformLocation(texProgram,'uTransform'),texSampler=gl.getUniformLocation(texProgram,'uTexture');
+const stuccoTexture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,stuccoTexture);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([210,188,160,255]));gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+const stuccoImage=new Image();stuccoImage.onload=()=>{gl.bindTexture(gl.TEXTURE_2D,stuccoTexture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,stuccoImage);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.REPEAT);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);};stuccoImage.src='assets/textures/stucco.svg';
+function texturedFacade(x,z,w,d,h){let front=z+(z<12?d/2+.026:-d/2-.026),u=w/4,v=h/4;function vert(px,py,uu,vv){facadeVertices.push(px,py,front,uu,vv)}vert(x-w/2,.16,0,0);vert(x+w/2,.16,u,0);vert(x+w/2,h-.16,u,v);vert(x-w/2,.16,0,0);vert(x+w/2,h-.16,u,v);vert(x-w/2,h-.16,0,v)}
+function drawFacades(vp){if(!facadeVertices.length)return;gl.useProgram(texProgram);gl.uniformMatrix4fv(texVP,false,new Float32Array(vp));gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,stuccoTexture);gl.uniform1i(texSampler,0);gl.bindBuffer(gl.ARRAY_BUFFER,textureBuffer);gl.vertexAttribPointer(texPos,3,gl.FLOAT,false,20,0);gl.vertexAttribPointer(texUV,2,gl.FLOAT,false,20,12);gl.enableVertexAttribArray(texPos);gl.enableVertexAttribArray(texUV);gl.disable(gl.CULL_FACE);gl.drawArrays(gl.TRIANGLES,0,facadeVertices.length/5);gl.enable(gl.CULL_FACE);gl.disableVertexAttribArray(texPos);gl.disableVertexAttribArray(texUV);gl.useProgram(program);gl.uniformMatrix4fv(uVP,false,new Float32Array(vp))}
+function addBuilding(x,z,w,d,h,col,name){h*=1.75;buildings.push({x,z,w,d,h,name});m.box(x,h/2,z,w,h,d,col);texturedFacade(x,z,w,d,h);facadeDetails(x,z,w,d,h,col);m.box(x,h+.55,z,w+1,1.1,d+1,C.white);m.box(x,h+1.2,z,w+1.5,.32,d+1.5,C.roof);for(let k=-1;k<=1;k++){let wy=h*.58;if(w>8){m.box(x+k*w*.26,wy,z+(z<12? d/2+.07 : -d/2-.07),w*.18,h*.29,.15,[.26,.48,.59]);m.box(x+k*w*.26,wy,z+(z<12? d/2+.18 : -d/2-.18),w*.18,.26,.2,C.white);}}return {x,y:h+2,z,name};}
 function facadeDetails(x,z,w,d,h,col){
  const front=z+(z<12?d/2+.18:-d/2-.18),direction=z<12?1:-1;
  const grout=[Math.max(.1,col[0]*.79),Math.max(.1,col[1]*.79),Math.max(.1,col[2]*.79)];
@@ -86,7 +95,7 @@ for(let i=0;i<24;i++){let side=i%2?1:-1,x=side*rnd(106,137),z=rnd(-128,-13),col=
 for(let i=0;i<8;i++)carObjects.push({x:-150+i*32,z:57.9,v:(i%2?-1:1)*rnd(4,8),col:pick([C.white,C.red,C.blue,[.2,.3,.36]])});
 // always present detailed road furniture
 for(let x=-145;x<150;x+=26){m.box(x,2.2,41,.25,4.4,.25,C.ink);m.ball(x,4.5,41,.5,C.white,7);}
-const staticData=new Float32Array(m.d);m.d=[];gl.bindBuffer(gl.ARRAY_BUFFER,staticBuffer);gl.bufferData(gl.ARRAY_BUFFER,staticData,gl.STATIC_DRAW);let staticCount=staticData.length/9;
+const staticData=new Float32Array(m.d);m.d=[];gl.bindBuffer(gl.ARRAY_BUFFER,staticBuffer);gl.bufferData(gl.ARRAY_BUFFER,staticData,gl.STATIC_DRAW);gl.bindBuffer(gl.ARRAY_BUFFER,textureBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(facadeVertices),gl.STATIC_DRAW);let staticCount=staticData.length/9;
 function bindAndDraw(buf,count){gl.bindBuffer(gl.ARRAY_BUFFER,buf);let stride=9*4;gl.vertexAttribPointer(aPos,3,gl.FLOAT,false,stride,0);gl.vertexAttribPointer(aN,3,gl.FLOAT,false,stride,12);gl.vertexAttribPointer(aCol,3,gl.FLOAT,false,stride,24);gl.enableVertexAttribArray(aPos);gl.enableVertexAttribArray(aN);gl.enableVertexAttribArray(aCol);gl.drawArrays(gl.TRIANGLES,0,count);}
 // gameplay
 let player={x:0,y:13,z:34,yaw:0,pitch:0,roll:0,speed:12,vy:0,grounded:false,landing:false,stamina:100,carrying:null,poopAmmo:2,maxPoop:10,poopCooldown:0,screechCooldown:0,stealCooldown:0,flapPhase:0,wingPhase:0},state='menu',keys={},joy={x:0,y:0},touchButtons={},camera={x:0,y:20,z:54},countTime=0,score=0,wanted=0,combo=0,comboTimer=0,missionIndex=0,missionProgress=0,lastTime=performance.now(),time=0,nextHud=0,toastTimer=0,markerPulse=0,soundCtx=null,record=(()=>{try{return +(localStorage.getItem('gull3d_record')||0)}catch(e){return 0}})();
@@ -126,7 +135,7 @@ function flipState(){if(state==='menu'){state='play';$overlay.classList.add('hid
 el('startBtn').onclick=flipState;el('pauseBtn').onclick=flipState;
 window.addEventListener('keydown',e=>{if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();keys[e.code]=true;if(!e.repeat&&state==='play'){if(e.code==='KeyE'||e.code==='KeyF')steal();if(e.code==='KeyQ'||e.code==='KeyG')poop();if(e.code==='KeyR')screech();if(e.code==='KeyL')toggleLand();if(e.code==='Space'&&player.grounded)takeoff();if(e.code==='KeyT')respawn();}if(!e.repeat&&e.code==='Escape')flipState();});window.addEventListener('keyup',e=>{keys[e.code]=false});window.addEventListener('blur',()=>{keys={};touchButtons={}});
 canvas.addEventListener('click',()=>{if(state==='play'&&matchMedia('(pointer:fine)').matches)canvas.requestPointerLock?.()});document.addEventListener('mousemove',e=>{if(document.pointerLockElement===canvas&&state==='play'){player.yaw+=e.movementX*.0022;player.pitch=clamp(player.pitch-e.movementY*.0016,-.65,.55);}});
-const joybase=el('joystick'),knob=el('knob');let activeId=null;const updateJoy=e=>{let b=joybase.getBoundingClientRect(),x=(e.clientX-b.left-b.width/2)/(b.width*.39),y=(e.clientY-b.top-b.height/2)/(b.height*.39),l=Math.max(1,Math.hypot(x,y));joy.x=Math.abs(x/l)<.10?0:x/l;joy.y=Math.abs(y/l)<.10?0:y/l;knob.style.transform=`translate(${joy.x*31}px,${joy.y*31}px)`};joybase.addEventListener('pointerdown',e=>{activeId=e.pointerId;joybase.setPointerCapture(activeId);updateJoy(e)});joybase.addEventListener('pointermove',e=>{if(e.pointerId===activeId)updateJoy(e)});function releaseJoy(){activeId=null;joy.x=joy.y=0;knob.style.transform='translate(0,0)'}joybase.addEventListener('pointerup',releaseJoy);joybase.addEventListener('pointercancel',releaseJoy);
+const joybase=el('joystick'),knob=el('knob');let activeId=null;const updateJoy=e=>{let b=joybase.getBoundingClientRect(),range=(b.width-knob.offsetWidth)/2,x=(e.clientX-b.left-b.width/2)/range,y=(e.clientY-b.top-b.height/2)/range,l=Math.max(1,Math.hypot(x,y));joy.x=Math.abs(x/l)<.10?0:x/l;joy.y=Math.abs(y/l)<.10?0:y/l;knob.style.transform=`translate(${joy.x*range}px,${joy.y*range}px)`};joybase.addEventListener('pointerdown',e=>{activeId=e.pointerId;joybase.setPointerCapture(activeId);updateJoy(e)});joybase.addEventListener('pointermove',e=>{if(e.pointerId===activeId)updateJoy(e)});function releaseJoy(){activeId=null;joy.x=joy.y=0;knob.style.transform='translate(0,0)'}joybase.addEventListener('pointerup',releaseJoy);joybase.addEventListener('pointercancel',releaseJoy);
 for(let b of document.querySelectorAll('#actions button')){let t=b.dataset.control;b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);touchButtons[t]=true;if(state==='play'){if(t==='steal')steal();if(t==='poop')poop();if(t==='screech')screech();if(t==='land')toggleLand();}});b.addEventListener('pointerup',()=>touchButtons[t]=false);b.addEventListener('pointercancel',()=>touchButtons[t]=false);}
 let view=matIdentity(),worldTarget={x:0,y:9,z:0},onTop=false;
 function standingSurface(x,z){
@@ -145,7 +154,7 @@ function toggleLand(){if(player.grounded){takeoff();return;}if(player.landing){p
 
 function movement(dt){
  player.stealCooldown=Math.max(0,player.stealCooldown-dt);player.screechCooldown=Math.max(0,player.screechCooldown-dt);player.poopCooldown=Math.max(0,player.poopCooldown-dt);
- let rawSteer=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+joy.x;
+ let rawSteer=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)-joy.x;
  let steer=Math.sign(rawSteer)*Math.pow(Math.min(1,Math.abs(rawSteer)),1.45);
  let rawThrottle=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0)-joy.y;
  let throttle=Math.sign(rawThrottle)*Math.pow(Math.min(1,Math.abs(rawThrottle)),1.25);
@@ -169,13 +178,13 @@ function movement(dt){
    player.speed+=(2.0-player.speed)*Math.min(1,dt*3.2);player.vy+=( -6.3-player.vy)*Math.min(1,dt*2.7);
    if(flap){player.landing=false;player.vy=Math.max(player.vy,4);}
   }else{
-   player.speed=clamp(player.speed+throttle*dt*11-(Math.abs(throttle)<.08?(player.speed-10)*1.1*dt:0),3,25);
+   player.speed=clamp(player.speed+throttle*dt*11-(Math.abs(throttle)<.08?(player.speed-8)*1.9*dt:0),3,25);
    if(braking)player.speed+=(5-player.speed)*Math.min(1,dt*3.5);
    if(flap&&player.stamina>3){player.vy+=27*dt;player.stamina-=32*dt;player.wingPhase+=dt*19;audioFlapTimer-=dt;
     if(audioFlapTimer<0){audioFlapTimer=.5;audio(175,.12,'triangle',-60);}}
    else{player.stamina=clamp(player.stamina+14*dt,0,100);audioFlapTimer=0;}
    if(dive){player.vy-=34*dt;player.speed=Math.min(41,player.speed+14*dt);player.pitch+=(-.48-player.pitch)*dt*3;}
-   if(!dive)player.vy+=(0.35-player.vy)*Math.min(1,dt*(player.speed>10?1.5:.9));else player.vy-=8*dt;
+   if(!dive){const sink=flap?-0.4:-2.7;player.vy+=(sink-player.vy)*Math.min(1,dt*(flap?.35:1.9));}else player.vy-=8*dt;
   }
   player.vy=clamp(player.vy,-22,14);
   let fx=-Math.sin(player.yaw),fz=-Math.cos(player.yaw);player.x+=fx*player.speed*dt;player.z+=fz*player.speed*dt;player.y+=player.vy*dt;
@@ -267,7 +276,7 @@ function project(pos,vp){let x=pos.x,y=pos.y,z=pos.z,cw=vp[3]*x+vp[7]*y+vp[11]*z
 let activeVP=matIdentity();
 function render(dt){let width=innerWidth,height=innerHeight,dpr=Math.min(1.6,devicePixelRatio||1),w=Math.floor(width*dpr),h=Math.floor(height*dpr);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);}
 let yaw=player.yaw,fx=-Math.sin(yaw),fz=-Math.cos(yaw),behind=player.grounded?6.9:9.3;
-let desired={x:player.x-fx*behind,y:player.y+(player.grounded?2.5:4.0)+player.speed*.035,z:player.z-fz*behind};let smooth=1-Math.exp(-dt*6);camera.x+=(desired.x-camera.x)*smooth;camera.y+=(desired.y-camera.y)*smooth;camera.z+=(desired.z-camera.z)*smooth;let focus={x:player.x+fx*11,y:player.y+player.pitch*4+(player.grounded?.6:.8),z:player.z+fz*11};activeVP=matMul(perspective(65*Math.PI/180,canvas.width/canvas.height,.1,500),lookAt(camera,focus));gl.uniformMatrix4fv(uVP,false,new Float32Array(activeVP));gl.uniform3f(uCamera,camera.x,camera.y,camera.z);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);bindAndDraw(staticBuffer,staticCount);let dynamicData=buildDynamics();gl.bindBuffer(gl.ARRAY_BUFFER,dynamicBuffer);gl.bufferData(gl.ARRAY_BUFFER,dynamicData,gl.DYNAMIC_DRAW);bindAndDraw(dynamicBuffer,dynamicData.length/9);
+let desired={x:player.x-fx*behind,y:player.y+(player.grounded?2.5:4.0)+player.speed*.035,z:player.z-fz*behind};let smooth=1-Math.exp(-dt*6);camera.x+=(desired.x-camera.x)*smooth;camera.y+=(desired.y-camera.y)*smooth;camera.z+=(desired.z-camera.z)*smooth;let focus={x:player.x+fx*11,y:player.y+player.pitch*4+(player.grounded?.6:.8),z:player.z+fz*11};activeVP=matMul(perspective(65*Math.PI/180,canvas.width/canvas.height,.1,500),lookAt(camera,focus));gl.uniformMatrix4fv(uVP,false,new Float32Array(activeVP));gl.uniform3f(uCamera,camera.x,camera.y,camera.z);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);bindAndDraw(staticBuffer,staticCount);drawFacades(activeVP);let dynamicData=buildDynamics();gl.bindBuffer(gl.ARRAY_BUFFER,dynamicBuffer);gl.bufferData(gl.ARRAY_BUFFER,dynamicData,gl.DYNAMIC_DRAW);bindAndDraw(dynamicBuffer,dynamicData.length/9);
 if(state==='play'){for(let l of locationLabels){let s=project(l,activeVP),visible=s&&s.w<180&&s.x>0&&s.x<w&&s.y>0&&s.y<h;l.el.style.display=visible?'block':'none';if(visible){l.el.style.left=(s.x/dpr)+'px';l.el.style.top=(s.y/dpr)+'px';}}}else for(let l of locationLabels)l.el.style.display='none';
 }
 function findTarget(){let t=getMission().type;if(t==='deliver'&&player.carrying)return {x:nest.x,z:nest.z,y:nest.y};if(t==='wheel')return wheel;
