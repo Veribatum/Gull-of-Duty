@@ -142,7 +142,24 @@ el('startBtn').onclick=flipState;el('pauseBtn').onclick=flipState;
 window.addEventListener('keydown',e=>{if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();keys[e.code]=true;if(!e.repeat&&state==='play'){if(e.code==='KeyE'||e.code==='KeyF')steal();if(e.code==='KeyQ'||e.code==='KeyG')poop();if(e.code==='KeyR')screech();if(e.code==='KeyL')toggleLand();if(e.code==='Space'&&player.grounded)takeoff();if(e.code==='KeyT')respawn();}if(!e.repeat&&e.code==='Escape')flipState();});window.addEventListener('keyup',e=>{keys[e.code]=false});window.addEventListener('blur',()=>{keys={};touchButtons={}});
 canvas.addEventListener('click',()=>{if(state==='play'&&matchMedia('(pointer:fine)').matches)canvas.requestPointerLock?.()});document.addEventListener('mousemove',e=>{if(document.pointerLockElement===canvas&&state==='play'){player.yaw+=e.movementX*.0022;player.pitch=clamp(player.pitch-e.movementY*.0016,-.65,.55);}});
 const joybase=el('joystick'),knob=el('knob');let activeId=null;const updateJoy=e=>{let b=joybase.getBoundingClientRect(),range=(b.width-knob.offsetWidth)/2,x=(e.clientX-b.left-b.width/2)/range,y=(e.clientY-b.top-b.height/2)/range,l=Math.max(1,Math.hypot(x,y));joy.x=Math.abs(x/l)<.10?0:x/l;joy.y=Math.abs(y/l)<.10?0:y/l;knob.style.transform=`translate(${joy.x*range}px,${joy.y*range}px)`};joybase.addEventListener('pointerdown',e=>{activeId=e.pointerId;joybase.setPointerCapture(activeId);updateJoy(e)});joybase.addEventListener('pointermove',e=>{if(e.pointerId===activeId)updateJoy(e)});function releaseJoy(){activeId=null;joy.x=joy.y=0;knob.style.transform='translate(0,0)'}joybase.addEventListener('pointerup',releaseJoy);joybase.addEventListener('pointercancel',releaseJoy);
-for(let b of document.querySelectorAll('#actions button')){let t=b.dataset.control;b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);b.classList.add('pressed');touchButtons[t]=true;if(state==='play'){if(t==='steal')steal();if(t==='poop')poop();if(t==='screech')screech();if(t==='land')toggleLand();}});for(let eventName of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(eventName,()=>{touchButtons[t]=false;b.classList.remove('pressed');});}
+// Coordinate-based action targeting: each press is assigned using the visible button rectangle.
+// Handles iOS home-screen viewport scaling without relying on overlapping transformed hit areas.
+const actionButtons=[...document.querySelectorAll('#actions button')];
+let actionPointer=new Map();
+function actionAt(clientX,clientY){let match=null,best=Infinity;
+ for(let b of actionButtons){let r=b.getBoundingClientRect();if(clientX>=r.left&&clientX<=r.right&&clientY>=r.top&&clientY<=r.bottom){let d=Math.hypot(clientX-(r.left+r.right)/2,clientY-(r.top+r.bottom)/2);if(d<best){match=b;best=d;}}}
+ return match;
+}
+function releaseAction(id){let b=actionPointer.get(id);if(!b)return;actionPointer.delete(id);let t=b.dataset.control;touchButtons[t]=false;b.classList.remove('pressed');}
+const actionRoot=document.getElementById('actions');
+actionRoot.addEventListener('pointerdown',e=>{
+ let b=actionAt(e.clientX,e.clientY);if(!b)return;
+ e.preventDefault();e.stopPropagation();const t=b.dataset.control;actionPointer.set(e.pointerId,b);b.classList.add('pressed');touchButtons[t]=true;
+ try{actionRoot.setPointerCapture(e.pointerId)}catch(err){}
+ if(state==='play'){if(t==='steal')steal();if(t==='poop')poop();if(t==='screech')screech();if(t==='land')toggleLand();}
+},{capture:true});
+for(let eventName of ['pointerup','pointercancel','lostpointercapture'])actionRoot.addEventListener(eventName,e=>{releaseAction(e.pointerId)});
+window.addEventListener('blur',()=>{for(let id of [...actionPointer.keys()])releaseAction(id)});
 let view=matIdentity(),worldTarget={x:0,y:9,z:0},onTop=false;
 function standingSurface(x,z){
  // Deck and rooftop heights are sourced from the actual city geometry.
@@ -177,7 +194,7 @@ function movement(dt){
   }
  }
  if(!player.grounded){
-  player.yaw+=steer*dt*(player.speed<11?2.25:1.9);player.roll+=(clamp(-steer*.4,-.52,.52)-player.roll)*Math.min(1,dt*5);
+  player.yaw+=steer*dt*(player.speed<11?2.25:1.9);player.roll+=(clamp(steer*.4,-.52,.52)-player.roll)*Math.min(1,dt*5);
   player.pitch+=(0-player.pitch)*Math.min(1,dt*.7);
   if(player.landing){
    // A deliberately slow, steerable approach; no forced forward zooming on touchdown.
@@ -221,7 +238,7 @@ for(let f of foods)if(!f.available&&f!==player.carrying){f.timer-=dt;if(f.timer<
 for(let p of poops){p.ttl-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;p.vy-=29*dt;let hit=false;for(let t of tourists){if(p.ttl<=0||hit)break;if(Math.hypot(p.x-t.x,p.z-t.z)<1.5&&p.y<(t.onPier?4.95:3.80)&&p.y>(t.onPier?1.05:-.3)){t.hit=4;t.scared=4;t.dir=rnd(-3,3);spawnSplat(p.x,(t.onPier?1.14:0)+3.05,p.z);award(t.onPier?230:170,pick(['DIRECT HIT! 💩','POOP STRIKE!','YOU ABSOLUTE MENACE!','BIRD BOMB!']));advance('hit');if(t.onPier)advance('pier');p.ttl=0;hit=true;}}if(!hit){for(let c of carObjects){if(Math.abs(p.x-c.x)<2.4&&Math.abs(p.z-c.z)<1.65&&p.y<2.2&&p.y>0){spawnSplat(p.x,1.75,p.z);award(140,'WINDSHIELD WASH REQUIRED!');advance('car');p.ttl=0;hit=true;break;}}}if(!hit&&p.y<=(standingSurface(p.x,p.z)??0)){spawnSplat(p.x,(standingSurface(p.x,p.z)??0)+.05,p.z);p.ttl=0;award(3);}}
 poops=poops.filter(p=>p.ttl>0);for(let s of splats)s.ttl-=dt;splats=splats.filter(s=>s.ttl>0);for(let c of carObjects){if(!c.v)continue;c.x+=c.v*dt;if(Math.abs(c.x)>156)c.v*=-1;}
 }
-function makeNPC(mesh,p){let bob=p.hit>0?-.55:Math.abs(Math.sin(p.phase))*.08,tip=p.hit>0?-.7:0;mesh.push(p.x,p.onPier?1.14:0,p.z,p.dir||0,0,tip);mesh.scale(1.95);mesh.cylinder(0,.68+bob,0,.26,1.0,p.shirt,7);mesh.ball(0,1.47+bob,0,.31,p.skin,7,5);mesh.box(0,1.73+bob,.08,.35,.11,.4,[.26,.22,.18]);mesh.box(-.12,1.55+bob,-.20,.05,.05,.035,[.12,.16,.18]);mesh.box(.12,1.55+bob,-.20,.05,.05,.035,[.12,.16,.18]);mesh.box(0,1.20+bob,-.27,.18,.08,.04,[.93,.91,.86]);let step=p.scared>0?Math.sin(p.phase)*.45:Math.sin(p.phase)*.23;for(let s of [-1,1]){mesh.push(s*.15,.26,0,0,step*s,0);mesh.cylinder(0,0,0,.095,.54,[.24,.3,.38],6);mesh.pop();mesh.push(s*.37,1.02+bob,0,0,p.scared>0?-1.1:step*s*.5,0);mesh.cylinder(0,-.12,0,.10,.6,p.skin,5);mesh.pop()}if(p.hit>0){mesh.ball(0,1.88,-.15,.24,[.94,.95,.89],7,4);}mesh.pop();mesh.pop()}
+function makeNPC(mesh,p){let bob=p.hit>0?-.55:Math.abs(Math.sin(p.phase))*.08,tip=p.hit>0?-.7:0;mesh.push(p.x,p.onPier?1.14:0,p.z,p.dir||0,0,tip);mesh.scale(1.95);mesh.cylinder(0,.97+bob,0,.29,.96,p.shirt,8);mesh.box(0,.49+bob,0,.49,.25,.36,[.24,.3,.38]);mesh.ball(0,1.47+bob,0,.31,p.skin,7,5);mesh.box(0,1.73+bob,.08,.35,.11,.4,[.26,.22,.18]);mesh.box(-.12,1.55+bob,-.20,.05,.05,.035,[.12,.16,.18]);mesh.box(.12,1.55+bob,-.20,.05,.05,.035,[.12,.16,.18]);mesh.box(0,1.20+bob,-.27,.18,.08,.04,[.93,.91,.86]);let step=p.scared>0?Math.sin(p.phase)*.45:Math.sin(p.phase)*.23;for(let s of [-1,1]){mesh.push(s*.15,.225,0,0,step*s*.65,0);mesh.cylinder(0,0,0,.105,.40,p.skin,7);mesh.box(0,-.195,-.055,.20,.105,.33,[.17,.21,.26]);mesh.pop();mesh.push(s*.37,1.02+bob,0,0,p.scared>0?-1.1:step*s*.5,0);mesh.cylinder(0,-.12,0,.10,.6,p.skin,5);mesh.pop()}if(p.hit>0){mesh.ball(0,1.88,-.15,.24,[.94,.95,.89],7,4);}mesh.pop();mesh.pop()}
 function renderProp(mesh,p){mesh.push(p.x,p.y,p.z,0,0,clamp(p.tip,-1.35,1.35));if(p.type==='umbrella'){mesh.cylinder(0,1.6,0,.085,3.2,[.83,.82,.76],6);for(let i=0;i<8;i++){let a=i*Math.PI/4,b=(i+1)*Math.PI/4;mesh.tri([0,3.6,0],[Math.cos(a)*2.0,2.7,Math.sin(a)*2.0],[Math.cos(b)*2.0,2.7,Math.sin(b)*2.0],i%2?p.col:C.white)}}
 if(p.type==='chair'){mesh.push(0,.35,0,0,0,-.14);mesh.box(0,.4,0,1.7,.2,1.15,p.col);mesh.box(0,1,-.47,1.7,1.1,.22,p.col);for(let s of [-1,1])for(let t of [-1,1])mesh.cylinder(s*.68,.15,t*.43,.08,.3,C.wood,5);mesh.pop()}
 if(p.type==='ball'){mesh.ball(0,.8,0,1,p.col,10,7);mesh.torus(0,.8,0,.7,.09,C.white,14)}
